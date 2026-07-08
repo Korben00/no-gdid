@@ -1,21 +1,21 @@
 <#
 .SYNOPSIS
-    Get-GDID-Audit.ps1 — Lit le Global Device Identifier (GDID) local et audite
-    la chaine de provisioning/reporting Microsoft. LECTURE SEULE, ne modifie rien.
+    Get-GDID-Audit.ps1 - Reads the local Global Device Identifier (GDID) and audits
+    the Microsoft provisioning/reporting chain. READ ONLY, changes nothing.
 
 .DESCRIPTION
-    Basé sur le reverse engineering public (SmtimesIWndr/gdid-reversal) et la
-    plainte fédérale United States v. Peter Stokes (N.D. Ill., 2026-07).
+    Based on public reverse engineering (SmtimesIWndr/gdid-reversal) and the federal
+    complaint United States v. Peter Stokes (N.D. Ill., 2026-07).
 
-    Le GDID est un PUID (Passport Unique ID) 64-bit assigné par login.live.com,
-    stocké en clair dans la ruche utilisateur, enregistré côté serveur par CDP,
-    puis remonté par Delivery Optimization sous UCDOStatus.GlobalDeviceId.
+    The GDID is a 64-bit PUID (Passport Unique ID) assigned by login.live.com, stored
+    in cleartext in the user hive, registered server-side by CDP, then reported by
+    Delivery Optimization as UCDOStatus.GlobalDeviceId.
 
-    Ce script NE FAIT AUCUNE MODIFICATION. Il sert à établir la baseline avant
-    toute mitigation.
+    This script makes NO modifications. It establishes a baseline before any mitigation.
 
 .NOTES
-    À exécuter dans une VM Windows 11. Aucune donnée n'est envoyée nulle part.
+    Run inside a Windows 11 VM. Nothing is sent anywhere. ASCII-only on purpose so it
+    parses under any codepage (Windows PowerShell 5.1 reads .ps1 as ANSI by default).
 #>
 
 $ErrorActionPreference = 'SilentlyContinue'
@@ -25,13 +25,15 @@ function Write-Section($title) {
     Write-Host "==== $title ====" -ForegroundColor Cyan
 }
 
-Write-Host "GDID Audit — lecture seule" -ForegroundColor Green
-Write-Host "Build Windows : $((Get-CimInstance Win32_OperatingSystem).Caption) $([System.Environment]::OSVersion.Version)"
+Write-Host "GDID Audit - read only" -ForegroundColor Green
+Write-Host ("Windows : {0} {1}" -f (Get-CimInstance Win32_OperatingSystem).Caption, [System.Environment]::OSVersion.Version)
+Write-Host ("Edition : {0}" -f (Get-CimInstance Win32_OperatingSystem).OperatingSystemSKU)
+Write-Host ("Elevated: {0}" -f ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator))
 
 # ---------------------------------------------------------------------------
-# 1. PUID / GDID depuis la ruche identité (accès utilisateur, pas d'admin)
+# 1. PUID / GDID from the identity hive (user access, no admin needed)
 # ---------------------------------------------------------------------------
-Write-Section "1. PUID / GDID (registre identité HKCU)"
+Write-Section "1. PUID / GDID (identity registry, HKCU)"
 
 $extProps = 'HKCU:\SOFTWARE\Microsoft\IdentityCRL\ExtendedProperties'
 $lid = (Get-ItemProperty -Path $extProps).LID
@@ -40,25 +42,25 @@ if ($lid) {
     Write-Host "LID (hex)      : $lid"
     try {
         $decimal = [Convert]::ToUInt64($lid, 16)
-        Write-Host "GDID (serveur) : g:$decimal" -ForegroundColor Yellow
+        Write-Host "GDID (server)  : g:$decimal" -ForegroundColor Yellow
     } catch {
-        Write-Host "  (conversion hex->decimal impossible : format inattendu '$lid')" -ForegroundColor Red
+        Write-Host "  (hex->decimal conversion failed, unexpected format '$lid')" -ForegroundColor Red
     }
 } else {
-    Write-Host "ExtendedProperties\LID vide — fallback sur Immersive Token..." -ForegroundColor DarkGray
+    Write-Host "ExtendedProperties\LID empty - falling back to Immersive Token..." -ForegroundColor DarkGray
     $tokens = Get-ItemProperty 'HKCU:\SOFTWARE\Microsoft\IdentityCRL\Immersive\production\Token\*'
     $devId  = $tokens | Select-Object -ExpandProperty DeviceId -First 1
     if ($devId) {
         Write-Host "DeviceId (Immersive) : $devId" -ForegroundColor Yellow
     } else {
-        Write-Host "Aucun PUID trouvé dans la ruche utilisateur (pas de MSA provisionné ?)." -ForegroundColor DarkGray
+        Write-Host "No PUID found in the user hive (no MSA provisioned?)." -ForegroundColor DarkGray
     }
 }
 
 # ---------------------------------------------------------------------------
-# 2. Cache d'identité HKLM (nécessite SYSTEM/admin pour tout voir)
+# 2. Machine identity cache (HKLM - needs admin/SYSTEM to see everything)
 # ---------------------------------------------------------------------------
-Write-Section "2. Cache identité machine (HKLM — partiel sans admin)"
+Write-Section "2. Machine identity cache (HKLM - partial without admin)"
 
 $negCache = 'HKLM:\SOFTWARE\Microsoft\IdentityCRL\NegativeCache'
 if (Test-Path $negCache) {
@@ -66,56 +68,56 @@ if (Test-Path $negCache) {
         Write-Host "NegativeCache : $($_.PSChildName)"
     }
 } else {
-    Write-Host "NegativeCache absent ou non lisible (droits insuffisants)." -ForegroundColor DarkGray
+    Write-Host "NegativeCache absent or not readable (insufficient rights)." -ForegroundColor DarkGray
 }
 
 # ---------------------------------------------------------------------------
-# 3. État des services de la chaîne
+# 3. State of the chain services
 # ---------------------------------------------------------------------------
-Write-Section "3. Chaîne de services (mint -> register -> report)"
+Write-Section "3. Service chain (mint -> register -> report)"
 
 $chain = [ordered]@{
-    'wlidsvc'    = 'Mint — provisionne le PUID auprès de login.live.com'
-    'CDPSvc'     = 'Register — enregistre auprès du Device Directory Service'
-    'CDPUserSvc' = 'Register — variante utilisateur (nom suffixé par session)'
-    'DoSvc'      = 'Report — remonte UCDOStatus.GlobalDeviceId'
-    'DiagTrack'  = 'Télémétrie générale (Connected User Experiences)'
+    'wlidsvc'    = 'Mint - provisions the PUID from login.live.com'
+    'CDPSvc'     = 'Register - registers with the Device Directory Service'
+    'CDPUserSvc' = 'Register - per-user variant (name suffixed per session)'
+    'DoSvc'      = 'Report - reports UCDOStatus.GlobalDeviceId'
+    'DiagTrack'  = 'General telemetry (Connected User Experiences)'
 }
 
 foreach ($name in $chain.Keys) {
     $svc = Get-Service | Where-Object { $_.Name -like "$name*" } | Select-Object -First 1
     if ($svc) {
         $color = if ($svc.Status -eq 'Running') { 'Red' } else { 'Green' }
-        Write-Host ("{0,-12} {1,-10} — {2}" -f $svc.Name, $svc.Status, $chain[$name]) -ForegroundColor $color
+        Write-Host ("{0,-14} {1,-10} - {2}" -f $svc.Name, $svc.Status, $chain[$name]) -ForegroundColor $color
     } else {
-        Write-Host ("{0,-12} {1,-10} — {2}" -f $name, 'ABSENT', $chain[$name]) -ForegroundColor DarkGray
+        Write-Host ("{0,-14} {1,-10} - {2}" -f $name, 'ABSENT', $chain[$name]) -ForegroundColor DarkGray
     }
 }
 
 # ---------------------------------------------------------------------------
-# 4. Sonde Delivery Optimization (best-effort — à valider sur la VM)
+# 4. Delivery Optimization probe (best-effort - to confirm on the VM)
 # ---------------------------------------------------------------------------
-Write-Section "4. Delivery Optimization (sonde exploratoire)"
+Write-Section "4. Delivery Optimization (exploratory probe)"
 
 if (Get-Command Get-DeliveryOptimizationStatus -ErrorAction SilentlyContinue) {
     $do = Get-DeliveryOptimizationStatus
     if ($do) {
-        # Le champ GlobalDeviceId vit surtout côté Azure Monitor (UCDOStatus).
-        # On dumpe toutes les propriétés pour voir ce que la machine expose en local.
+        # The GlobalDeviceId field lives mostly server-side (Azure Monitor UCDOStatus).
+        # We dump every property to see what the machine exposes locally.
         $do | Get-Member -MemberType Property | Select-Object -ExpandProperty Name | ForEach-Object {
             Write-Host ("  {0}" -f $_)
         }
     } else {
-        Write-Host "Get-DeliveryOptimizationStatus n'a rien retourné." -ForegroundColor DarkGray
+        Write-Host "Get-DeliveryOptimizationStatus returned nothing." -ForegroundColor DarkGray
     }
 } else {
-    Write-Host "Cmdlet Get-DeliveryOptimizationStatus indisponible sur cette édition." -ForegroundColor DarkGray
+    Write-Host "Get-DeliveryOptimizationStatus cmdlet not available on this edition." -ForegroundColor DarkGray
 }
 
 # ---------------------------------------------------------------------------
-# 5. Endpoints DDS/CDP (résolution DNS seulement, aucune connexion)
+# 5. DDS/CDP endpoints (DNS resolution only, no connection)
 # ---------------------------------------------------------------------------
-Write-Section "5. Endpoints Device Directory Service (résolution DNS)"
+Write-Section "5. Device Directory Service endpoints (DNS resolution)"
 
 $endpoints = @(
     'dds.microsoft.com'
@@ -128,9 +130,9 @@ foreach ($ep in $endpoints) {
     if ($resolved) {
         Write-Host ("{0,-30} -> {1}" -f $ep, $resolved)
     } else {
-        Write-Host ("{0,-30} -> (non résolu / bloqué)" -f $ep) -ForegroundColor Green
+        Write-Host ("{0,-30} -> (unresolved / blocked)" -f $ep) -ForegroundColor Green
     }
 }
 
 Write-Host ""
-Write-Host "Audit terminé — aucune modification effectuée." -ForegroundColor Green
+Write-Host "Audit done - no changes made." -ForegroundColor Green
