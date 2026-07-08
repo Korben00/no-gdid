@@ -74,8 +74,22 @@ cdpcs.access.microsoft.com
 - `[NO-GDID VÉRIFIÉ]` **Pas de `GlobalDeviceId` en local via Delivery Optimization** :
   `Get-DeliveryOptimizationStatus` ne renvoie que des stats de download. La valeur reportée
   vit côté Azure Monitor (`UCDOStatus`), pas sur le disque. Seule copie locale = le registre.
-- `[À CONFIRMER]` Les 4 endpoints DDS documentés ne résolvent pas sur la VM → liste
-  probablement interne/frontée. Vrais endpoints à découvrir par observation du trafic
-  (`audit/Get-GDID-Traffic.ps1`) avant tout blocage.
+- `[NO-GDID VÉRIFIÉ]` **Session MSA active** : `wlidsvc` maintient des connexions TLS
+  établies vers `20.190.160.131/67:443` (IP d'auth compte Microsoft / AADG). C'est le
+  minter du PUID. `CDPSvc`/`DoSvc` sans connexion au repos (enregistrement intermittent).
+- `[NO-GDID VÉRIFIÉ]` **Carte des endpoints** :
+  - `login.live.com` → `40.126.32.133` (mint MSA, via AADG traffic manager).
+  - `aad.cs.dds.microsoft.com` → `150.171.109.82` (Azure Front Door `*.tm-azurefd.net`) —
+    **seul front DDS publiquement résolvable**.
+  - `dds.microsoft.com`, `fd.dds.microsoft.com`, `cdpcs.access.microsoft.com` → **pas
+    d'enregistrement public**, MAIS présents dans le cache DNS avec réponse vide → la pile
+    CDP les **interroge** réellement. Noms cibles valides pour un blocage par hostname.
+  - `geo.prod.do.dsp.mp.microsoft.com` → `72.154.7.108` (Delivery Optimization).
+  - `settings-win.data.microsoft.com` (télémétrie settings, hors chemin GDID).
+- `[ASSESSED]` **Le PUID existe côté serveur dès le login MSA.** CDP/DDS/DO = couche de
+  corrélation/report, pas la génération. Bloquer CDP/DDS/DO réduit la corrélation mais
+  n'efface pas le PUID. Seul « pas de PUID » = pas de MSA.
 - `[À CONFIRMER]` `NegativeCache` (HKLM) illisible même en admin → nécessite `SYSTEM`
   (PsExec `-s`).
+- `[À TESTER]` H4 — suppression LID + restart `wlidsvc` → valeur identique (ancrage compte)
+  ou nouvelle ? Script `experiments/Test-GDID-Regeneration.ps1` (gaté, à lancer après snapshot).

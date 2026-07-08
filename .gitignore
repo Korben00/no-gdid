@@ -1,5 +1,13 @@
-Scratch, VM captures, secrets
+# Scratch, VM captures, secrets
 *.log
 *.tmp
 vm-captures/
 .DS_Store
+
+# Registry backups produced by experiments/ contain the real device PUID
+*.reg
+ExtendedProperties-backup-*.reg
+
+# Packet captures
+*.etl
+gdid.txt
