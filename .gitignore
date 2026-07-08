@@ -11,3 +11,6 @@ ExtendedProperties-backup-*.reg
 # Packet captures
 *.etl
 gdid.txt
+
+# runtime state from mitigation experiments
+mitigation-state.json
