@@ -81,7 +81,8 @@ Write-Host ("State saved: {0}" -f $stateFile) -ForegroundColor DarkGray
 Write-Host "== Blocking endpoints via hosts ==" -ForegroundColor Cyan
 $existing = Get-Content $hostsFile -ErrorAction SilentlyContinue
 foreach ($h in $blockHosts) {
-    if ($existing -match [regex]::Escape($h)) {
+    # Anchor on the full hostname (avoid 'dds.microsoft.com' matching 'fd.dds.microsoft.com')
+    if ($existing -match "(^|\s)$([regex]::Escape($h))(\s|$)") {
         Write-Host ("  {0}: already present, skipped" -f $h) -ForegroundColor DarkGray
     } else {
         Add-Content -Path $hostsFile -Value ("0.0.0.0 {0} {1}" -f $h, $tag) -Encoding ASCII

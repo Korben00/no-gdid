@@ -37,7 +37,9 @@ $existing = Get-Content $hostsFile -ErrorAction SilentlyContinue
 if (-not $Apply) {
     Write-Host "PREVIEW (no changes). Pass -Apply to write. Would blackhole:" -ForegroundColor Yellow
     foreach ($h in $blockHosts) {
-        $state = if ($existing -match [regex]::Escape($h)) { 'already present' } else { 'to add' }
+        # Anchor on the full hostname as a whole token: 'dds.microsoft.com' must NOT
+        # match inside 'fd.dds.microsoft.com' (substring false positive).
+        $state = if ($existing -match "(^|\s)$([regex]::Escape($h))(\s|$)") { 'already present' } else { 'to add' }
         Write-Host ("  0.0.0.0 {0,-34} [{1}]" -f $h, $state)
     }
     Write-Host "login.live.com is intentionally left alone (keeps MSA working)." -ForegroundColor DarkGray
@@ -45,7 +47,7 @@ if (-not $Apply) {
 }
 
 foreach ($h in $blockHosts) {
-    if ($existing -match [regex]::Escape($h)) {
+    if ($existing -match "(^|\s)$([regex]::Escape($h))(\s|$)") {
         Write-Host ("  {0}: already present, skipped" -f $h) -ForegroundColor DarkGray
     } else {
         Add-Content -Path $hostsFile -Value ("0.0.0.0 {0} {1}" -f $h, $tag) -Encoding ASCII

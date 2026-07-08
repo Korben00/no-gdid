@@ -38,27 +38,43 @@ if (-not $Apply) {
     exit 0
 }
 
+# Preload any previously-saved original state so a second -Apply never clobbers the
+# true pre-mitigation values (idempotency).
 $saved = @{}
+if (Test-Path $stateFile) {
+    try {
+        (Get-Content $stateFile -Raw | ConvertFrom-Json).psobject.Properties |
+            ForEach-Object { $saved[$_.Name] = $_.Value }
+    } catch { }
+}
 
-# CDPSvc via SCM
-$saved['CDPSvc'] = (Get-CimInstance Win32_Service -Filter "Name='CDPSvc'").StartMode
+# Record a service's ORIGINAL start value once; never overwrite it, and never record
+# an already-disabled state as the "original" (would make revert restore Disabled).
+function Save-Original($key, $current, $disabled) {
+    if (-not $saved.ContainsKey($key) -and "$current" -ne "$disabled") { $saved[$key] = $current }
+}
+
+# CDPSvc via SCM (StartMode is 'Auto' / 'Manual' / 'Disabled')
+$cdpMode = (Get-CimInstance Win32_Service -Filter "Name='CDPSvc'").StartMode
+Save-Original 'CDPSvc' $cdpMode 'Disabled'
 try {
     Stop-Service CDPSvc -Force -ErrorAction Stop
     Set-Service CDPSvc -StartupType Disabled -ErrorAction Stop
-    Write-Host ("  CDPSvc: stopped + disabled (was {0})" -f $saved['CDPSvc']) -ForegroundColor Green
+    Write-Host ("  CDPSvc: stopped + disabled (was {0})" -f $cdpMode) -ForegroundColor Green
 } catch {
     Write-Host ("  CDPSvc: FAILED ({0})" -f $_.Exception.Message) -ForegroundColor Red
 }
 
-# DoSvc + CDPUserSvc via registry
+# DoSvc + CDPUserSvc via registry (Start 4 = Disabled)
 foreach ($s in $regServices) {
     $reg = "HKLM:\SYSTEM\CurrentControlSet\Services\$s"
     if (Test-Path $reg) {
-        $saved[$s] = (Get-ItemProperty $reg).Start
+        $cur = (Get-ItemProperty $reg).Start
+        Save-Original $s $cur 4
         try {
             Set-ItemProperty -Path $reg -Name Start -Value 4 -ErrorAction Stop
             Get-Service | Where-Object { $_.Name -like "$s*" } | ForEach-Object { Stop-Service $_.Name -Force -ErrorAction SilentlyContinue }
-            Write-Host ("  {0}: registry Start=4 (was {1}) + stopped" -f $s, $saved[$s]) -ForegroundColor Green
+            Write-Host ("  {0}: registry Start=4 (was {1}) + stopped" -f $s, $cur) -ForegroundColor Green
         } catch {
             Write-Host ("  {0}: FAILED ({1})" -f $s, $_.Exception.Message) -ForegroundColor Red
         }

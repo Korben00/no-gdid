@@ -28,7 +28,7 @@ if (Test-Path $stateFile) { $state = Get-Content $stateFile -Raw | ConvertFrom-J
 function Get-Start($name) {
     if ($state -and $state.$name) {
         $v = $state.$name
-        if ($v -is [string]) { switch ($v) { 'Auto' {2} 'Manual' {3} 'Disabled' {3} default {$defaultStart[$name]} } }
+        if ($v -is [string]) { switch ($v) { 'Auto' {2} 'Manual' {3} default {$defaultStart[$name]} } }
         else { [int]$v }
     } else { $defaultStart[$name] }
 }
