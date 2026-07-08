@@ -6,6 +6,8 @@
 .DESCRIPTION
     Preview by default. Pass -Apply to actually edit the hosts file. Idempotent.
     Does NOT touch login.live.com (that would break Microsoft Account sign-in).
+    On first -Apply the original hosts file is backed up to hosts.nogdid-backup
+    (kept intact on later runs) as a manual recovery net.
 
     Verified on Windows 11 Pro 26200: after applying, the five hosts resolve to
     0.0.0.0 while login.live.com still resolves and wlidsvc stays connected.
@@ -19,8 +21,9 @@
 param([switch]$Apply)
 
 $ErrorActionPreference = 'Stop'
-$tag       = '# no-gdid'
-$hostsFile = "$env:WINDIR\System32\drivers\etc\hosts"
+$tag        = '# no-gdid'
+$hostsFile   = "$env:WINDIR\System32\drivers\etc\hosts"
+$hostsBackup = "$hostsFile.nogdid-backup"
 $blockHosts = @(
     'dds.microsoft.com'
     'fd.dds.microsoft.com'
@@ -44,6 +47,14 @@ if (-not $Apply) {
     }
     Write-Host "login.live.com is intentionally left alone (keeps MSA working)." -ForegroundColor DarkGray
     exit 0
+}
+
+# One-time backup of the original hosts file (kept intact if it already exists).
+if (-not (Test-Path $hostsBackup)) {
+    Copy-Item -Path $hostsFile -Destination $hostsBackup -Force
+    Write-Host ("Backup of hosts written: {0}" -f $hostsBackup) -ForegroundColor DarkGray
+} else {
+    Write-Host ("Backup already exists (kept): {0}" -f $hostsBackup) -ForegroundColor DarkGray
 }
 
 foreach ($h in $blockHosts) {
