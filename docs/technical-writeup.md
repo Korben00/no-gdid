@@ -60,3 +60,22 @@ cdpcs.access.microsoft.com
 - [ ] H2 — `Stop-Service`/désactivation de `CDPSvc`+`DoSvc` stoppe la remontée `GlobalDeviceId`.
 - [ ] H3 — Édition (Home/Pro vs Enterprise/LTSC) change ce qui est neutralisable.
 - [ ] H4 — Après revert, la valeur `g:<décimal>` est-elle identique (persistance PUID) ?
+
+## 7. Résultats VM (baseline 2026-07-08 — Windows 11 Pro, build 26200)
+
+- `[NO-GDID VÉRIFIÉ]` **Lecture du GDID reproduite** : `LID=001800149354BDDD` → `g:6755487812206045`.
+  La méthode hex→UInt64 de la source primaire fonctionne à l'identique.
+- `[NO-GDID VÉRIFIÉ]` **Namespace `0x0018` confirmé** : notre PUID `0x001800149354BDDD`
+  et celui de la plainte Stokes `0x0018000FC8CB93CC` partagent les 16 bits de poids fort
+  → tous les device-PUID Windows sont dans la plage `g:67554…`.
+- `[NO-GDID VÉRIFIÉ]` **DiagTrack n'est PAS dans le chemin du GDID** : DiagTrack était
+  `Stopped`, pourtant le GDID est présent et `wlidsvc`/`CDPSvc`/`CDPUserSvc`/`DoSvc`
+  tournaient. → Couper la télémétrie ne neutralise pas le mouchard. (Démonte le conseil courant.)
+- `[NO-GDID VÉRIFIÉ]` **Pas de `GlobalDeviceId` en local via Delivery Optimization** :
+  `Get-DeliveryOptimizationStatus` ne renvoie que des stats de download. La valeur reportée
+  vit côté Azure Monitor (`UCDOStatus`), pas sur le disque. Seule copie locale = le registre.
+- `[À CONFIRMER]` Les 4 endpoints DDS documentés ne résolvent pas sur la VM → liste
+  probablement interne/frontée. Vrais endpoints à découvrir par observation du trafic
+  (`audit/Get-GDID-Traffic.ps1`) avant tout blocage.
+- `[À CONFIRMER]` `NegativeCache` (HKLM) illisible même en admin → nécessite `SYSTEM`
+  (PsExec `-s`).
