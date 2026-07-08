@@ -59,7 +59,7 @@ cdpcs.access.microsoft.com
 - [ ] H1 — Bloquer les endpoints DDS/CDP (pare-feu) empêche l'enregistrement sans casser le login.
 - [ ] H2 — `Stop-Service`/désactivation de `CDPSvc`+`DoSvc` stoppe la remontée `GlobalDeviceId`.
 - [ ] H3 — Édition (Home/Pro vs Enterprise/LTSC) change ce qui est neutralisable.
-- [ ] H4 — Après revert, la valeur `g:<décimal>` est-elle identique (persistance PUID) ?
+- [x] H4 — VÉRIFIÉ : identique. Voir section 7.
 
 ## 7. Résultats VM (baseline 2026-07-08 — Windows 11 Pro, build 26200)
 
@@ -91,5 +91,13 @@ cdpcs.access.microsoft.com
   n'efface pas le PUID. Seul « pas de PUID » = pas de MSA.
 - `[À CONFIRMER]` `NegativeCache` (HKLM) illisible même en admin → nécessite `SYSTEM`
   (PsExec `-s`).
-- `[À TESTER]` H4 — suppression LID + restart `wlidsvc` → valeur identique (ancrage compte)
-  ou nouvelle ? Script `experiments/Test-GDID-Regeneration.ps1` (gaté, à lancer après snapshot).
+- `[NO-GDID VÉRIFIÉ]` **H4 — le GDID est ancré au compte, pas à la machine.**
+  Suppression de `LID` + restart `wlidsvc` → reste vide (mint on-demand). Après une
+  sollicitation MSA (ouverture du Microsoft Store), la valeur revient **IDENTIQUE**
+  (`g:6755487812206045`). → La suppression locale est cosmétique : le PUID est
+  re-téléchargé depuis les serveurs Microsoft contre le compte.
+- `[À TESTER]` Efficacité mitigation : désactivation `CDPSvc`+`CDPUserSvc`+`DoSvc` +
+  blocage pare-feu des endpoints CDP/DDS/DO → la remontée cesse-t-elle (observé via
+  `Get-GDID-Traffic.ps1`) ? Le GDID reste lisible localement mais n'est plus reporté.
+- `[À TESTER]` Bascule en compte local : le `LID`/GDID disparaît-il ? Un identifiant CDP
+  anonyme apparaît-il malgré tout (claim `[ASSESSED]` du chercheur) ?
