@@ -96,8 +96,20 @@ cdpcs.access.microsoft.com
   sollicitation MSA (ouverture du Microsoft Store), la valeur revient **IDENTIQUE**
   (`g:6755487812206045`). → La suppression locale est cosmétique : le PUID est
   re-téléchargé depuis les serveurs Microsoft contre le compte.
-- `[À TESTER]` Efficacité mitigation : désactivation `CDPSvc`+`CDPUserSvc`+`DoSvc` +
-  blocage pare-feu des endpoints CDP/DDS/DO → la remontée cesse-t-elle (observé via
-  `Get-GDID-Traffic.ps1`) ? Le GDID reste lisible localement mais n'est plus reporté.
+- `[NO-GDID VÉRIFIÉ]` **Mitigation blocage (compte MSA conservé)** :
+  - **hosts blackhole efficace** : `dds.` / `fd.dds.` / `aad.cs.dds.` / `cdpcs.access.` /
+    `geo.prod.do.dsp.mp.microsoft.com` → `0.0.0.0`. `login.live.com` résout toujours
+    (`20.190.160.64`), `wlidsvc` reste connecté → **session Microsoft intacte**.
+  - `CDPSvc` + `CDPUserSvc` (template `Start=4`) désactivés sans souci.
+  - **`DoSvc` protégé côté SCM** : `Set-Service DoSvc -StartupType Disabled` → « Accès
+    refusé » même admin. **Contournement : écrire `HKLM\SYSTEM\CurrentControlSet\Services\DoSvc\Start=4`
+    directement** → `StartType=Disabled`, puis `Stop-Service DoSvc` OK. (L'ACL de la clé
+    registre autorise l'admin là où le SCM le bloque.)
+  - Avant désactivation, `DoSvc` gardait ~15 connexions TLS vers `2.22.x` (Akamai / CDN
+    Delivery Optimization — probablement du contenu, pas prouvé être le report GDID).
+  - **Le GDID reste lisible localement** (`g:6755487812206045`) : non effacé, seulement
+    empêché de remonter.
+- `[À CONFIRMER]` État « after » propre : `DoSvc` désormais Disabled+Stopped, re-run
+  `Get-GDID-Traffic` → plus aucune connexion de la chaîne (capture finale pour l'article).
 - `[À TESTER]` Bascule en compte local : le `LID`/GDID disparaît-il ? Un identifiant CDP
   anonyme apparaît-il malgré tout (claim `[ASSESSED]` du chercheur) ?

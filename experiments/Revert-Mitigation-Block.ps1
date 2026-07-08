@@ -34,16 +34,30 @@ function Resolve-StartType($name, $modeString) {
         default    { $defaults[$name] }
     }
 }
+# StartMode string -> registry Start number (for SCM-protected services)
+function StartMode-ToNumber($modeString) {
+    switch ($modeString) { 'Auto' {2} 'Manual' {3} default {3} }
+}
 
-foreach ($s in @('CDPSvc','DoSvc')) {
-    $mode = if ($state -and $state.$s) { Resolve-StartType $s $state.$s } else { $defaults[$s] }
-    try {
-        Set-Service -Name $s -StartupType $mode -ErrorAction Stop
-        Start-Service -Name $s -ErrorAction SilentlyContinue
-        Write-Host ("  {0}: startup={1}, started" -f $s, $mode) -ForegroundColor Green
-    } catch {
-        Write-Host ("  {0}: FAILED ({1})" -f $s, $_.Exception.Message) -ForegroundColor Red
-    }
+# CDPSvc: normal SCM path works
+$mode = if ($state -and $state.'CDPSvc') { Resolve-StartType 'CDPSvc' $state.'CDPSvc' } else { $defaults['CDPSvc'] }
+try {
+    Set-Service -Name 'CDPSvc' -StartupType $mode -ErrorAction Stop
+    Start-Service -Name 'CDPSvc' -ErrorAction SilentlyContinue
+    Write-Host ("  CDPSvc: startup={0}, started" -f $mode) -ForegroundColor Green
+} catch {
+    Write-Host ("  CDPSvc: FAILED ({0})" -f $_.Exception.Message) -ForegroundColor Red
+}
+
+# DoSvc: SCM denies Set-Service; restore via registry Start value instead
+$doReg = 'HKLM:\SYSTEM\CurrentControlSet\Services\DoSvc'
+$doNum = if ($state -and $state.'DoSvc') { StartMode-ToNumber $state.'DoSvc' } else { 3 }
+try {
+    Set-ItemProperty -Path $doReg -Name Start -Value $doNum -ErrorAction Stop
+    Start-Service -Name 'DoSvc' -ErrorAction SilentlyContinue
+    Write-Host ("  DoSvc: registry Start restored to {0}" -f $doNum) -ForegroundColor Green
+} catch {
+    Write-Host ("  DoSvc: could not restore Start ({0}) - use snapshot" -f $_.Exception.Message) -ForegroundColor Yellow
 }
 
 $cdpUserReg = 'HKLM:\SYSTEM\CurrentControlSet\Services\CDPUserSvc'
