@@ -1,0 +1,5 @@
+Scratch, VM captures, secrets
+*.log
+*.tmp
+vm-captures/
+.DS_Store
