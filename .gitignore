@@ -14,3 +14,5 @@ gdid.txt
 
 # runtime state from mitigation experiments
 mitigation-state.json
+
+service-state.json

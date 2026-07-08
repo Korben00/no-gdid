@@ -109,7 +109,9 @@ cdpcs.access.microsoft.com
     Delivery Optimization — probablement du contenu, pas prouvé être le report GDID).
   - **Le GDID reste lisible localement** (`g:6755487812206045`) : non effacé, seulement
     empêché de remonter.
-- `[À CONFIRMER]` État « after » propre : `DoSvc` désormais Disabled+Stopped, re-run
-  `Get-GDID-Traffic` → plus aucune connexion de la chaîne (capture finale pour l'article).
+- `[NO-GDID VÉRIFIÉ]` **État final propre** : `CDPSvc`+`DoSvc`+`CDPUserSvc` tous Stopped
+  (PID 0), aucune connexion de la chaîne, 5 endpoints → `0.0.0.0`, `login.live.com` résout
+  (`40.126.31.69`) + `wlidsvc` Running → **remontée tarie, compte MSA intact**. Toutes les
+  hypothèses H1-H4 validées.
 - `[À TESTER]` Bascule en compte local : le `LID`/GDID disparaît-il ? Un identifiant CDP
   anonyme apparaît-il malgré tout (claim `[ASSESSED]` du chercheur) ?

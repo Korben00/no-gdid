@@ -37,9 +37,11 @@ Format serveur : `g:<décimal>` (le LID hex converti en entier non signé 64 bit
 
 | Dossier | Contenu | Statut |
 |---|---|---|
-| `audit/Get-GDID-Audit.ps1` | Lit *votre* GDID + état de la chaîne. **Lecture seule.** | ✅ écrit, à valider sur VM |
-| `mitigate/` | Blocage endpoints, neutralisation services, revert. | ⏳ écrits après validation VM |
-| `docs/technical-writeup.md` | Writeup sourcé (chaîne, registre, tags de confiance). | ✅ en cours |
+| `audit/Get-GDID-Audit.ps1` | Lit *votre* GDID + état de la chaîne. **Lecture seule.** | ✅ validé VM |
+| `audit/Get-GDID-Traffic.ps1` | Cartographie les vrais endpoints de la chaîne. **Lecture seule.** | ✅ validé VM |
+| `mitigate/` | Blocage endpoints (`hosts`), désactivation services, revert. `-Apply` requis. | ✅ validé VM |
+| `experiments/` | Sondes destructives d'investigation (regénération, mitigation), gatées. | ✅ |
+| `docs/technical-writeup.md` | Writeup sourcé + résultats VM vérifiés (tags de confiance). | ✅ |
 
 ## Avertissement
 
