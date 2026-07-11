@@ -113,5 +113,5 @@ cdpcs.access.microsoft.com
   (PID 0), aucune connexion de la chaîne, 5 endpoints → `0.0.0.0`, `login.live.com` résout
   (`40.126.31.69`) + `wlidsvc` Running → **remontée tarie, compte MSA intact**. Toutes les
   hypothèses H1-H4 validées.
-- `[À TESTER]` Bascule en compte local : le `LID`/GDID disparaît-il ? Un identifiant CDP
-  anonyme apparaît-il malgré tout (claim `[ASSESSED]` du chercheur) ?
+- `[NO-GDID VÉRIFIÉ]` **H3 Windows 10 LTSC build 19044.7417** Bascule en compte local : un `LID`/GDID
+  existe y compris lorsqu'uniquement un compte local n'est utilisé, dès l'installation
