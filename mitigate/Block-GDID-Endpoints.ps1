@@ -57,12 +57,33 @@ if (-not (Test-Path $hostsBackup)) {
     Write-Host ("Backup already exists (kept): {0}" -f $hostsBackup) -ForegroundColor DarkGray
 }
 
+# Collect every missing entry first, then write ONCE. Writing line-by-line
+# trips over the transient lock Defender/AV puts on hosts right after each
+# write (IOException: file is being used by another process).
+$toAdd = @()
 foreach ($h in $blockHosts) {
     if ($existing -match "(^|\s)$([regex]::Escape($h))(\s|$)") {
         Write-Host ("  {0}: already present, skipped" -f $h) -ForegroundColor DarkGray
     } else {
-        Add-Content -Path $hostsFile -Value ("0.0.0.0 {0} {1}" -f $h, $tag) -Encoding ASCII
-        Write-Host ("  {0}: blackholed" -f $h) -ForegroundColor Green
+        $toAdd += ("0.0.0.0 {0} {1}" -f $h, $tag)
+    }
+}
+if ($toAdd.Count -gt 0) {
+    $maxTries = 5
+    for ($try = 1; $try -le $maxTries; $try++) {
+        try {
+            Add-Content -Path $hostsFile -Value $toAdd -Encoding ASCII
+            break
+        } catch [System.IO.IOException] {
+            if ($try -eq $maxTries) {
+                Write-Host "hosts file still locked after $maxTries attempts (AV or another process holding it). Re-run the script; already-written entries are skipped." -ForegroundColor Red
+                throw
+            }
+            Start-Sleep -Milliseconds (400 * $try)
+        }
+    }
+    foreach ($line in $toAdd) {
+        Write-Host ("  {0}: blackholed" -f ($line -split '\s+')[1]) -ForegroundColor Green
     }
 }
 ipconfig /flushdns | Out-Null
