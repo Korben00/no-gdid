@@ -9,9 +9,11 @@ hidden per-account device ID that helped the FBI locate a suspect who was using 
 > *re-registering and reporting* it — it cannot undo what Microsoft already has. For
 > real privacy on sensitive work, the only reliable answer is not to depend on Windows.
 
-Every finding here was reproduced on a real Windows 11 Pro VM (build 26200). Nothing
-is theoretical. See [`docs/technical-writeup.md`](docs/technical-writeup.md) for the
-evidence, tagged by confidence level.
+Every finding here was reproduced on a real Windows 11 Pro VM (build 26200) before it
+was written down. Nothing is theoretical. See
+[`docs/technical-writeup.md`](docs/technical-writeup.md) for the evidence, tagged by
+confidence level — and [How this was built](#how-this-was-built) for what that
+verification actually involved.
 
 ---
 
@@ -103,9 +105,40 @@ Microsoft Account sign-in keeps working.
   `[STATIC]`, `[NO-GDID VÉRIFIÉ]`).
 - [`docs/FAQ.md`](docs/FAQ.md) — short answers to the obvious questions.
 
+## How this was built
+
+This project was investigated and written with heavy AI assistance (Claude). The commit
+history says so, and so does this section — you should not have to dig for it.
+
+What that means in practice, honestly:
+
+- **The AI drove the investigation.** It read the reverse engineering, mapped the
+  service chain, proposed the hypotheses to test, and wrote most of the PowerShell and
+  the prose you are reading.
+- **I ran every test myself, on my own VM.** Windows 11 Pro build 26200 in VMware,
+  signed into a real Microsoft Account, snapshot before each destructive step. The GDID
+  in the screenshots is that VM's, which is why I am comfortable showing it.
+- **The claims that mattered were checked by hand, not accepted.** Deleting the `LID`
+  key and restarting `wlidsvc` really does bring back the *same* identifier once any
+  Microsoft app asks for it — I watched it happen. `DiagTrack` was already stopped on
+  that VM and the GDID was still there, which is what killed the "just turn off
+  telemetry" advice. `DoSvc` really does refuse `Set-Service` as admin, which is why the
+  script goes through the registry instead. Each of these started as an AI hypothesis
+  and several of them were wrong until tested.
+- **What isn't mine, I don't claim.** My testing was Windows 11 Pro with a Microsoft
+  Account. The local-account case was an open question here until
+  [@Berbe](https://github.com/Berbe) contributed the observation on Windows 10 LTSC
+  19044.7417 (a `LID`/GDID exists from install even with a local account only). The
+  write-up records whose build each finding comes from — if a claim carries no build
+  number, treat it as weaker.
+
+If you find a claim here that does not hold on your machine, open an issue with your
+build number — that is worth more to this repo than agreement.
+
 ## Credits
 
 - Primary reverse engineering: [`SmtimesIWndr/gdid-reversal`](https://github.com/SmtimesIWndr/gdid-reversal).
+- Local-account observation on Windows 10 LTSC: [@Berbe](https://github.com/Berbe) (PR #3).
 - Case facts: *United States v. Peter Stokes*, N.D. Ill., July 2026.
 
 ## License
